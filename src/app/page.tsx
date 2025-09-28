@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import FileExplorer, { FileItem } from '@/components/FileExplorer';
 import CodeEditor from '@/components/CodeEditor';
 import Terminal from '@/components/Terminal';
 import Tabs from '@/components/Tabs';
