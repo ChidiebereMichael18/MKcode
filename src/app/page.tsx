@@ -1,363 +1,238 @@
 'use client';
 
-import { useState } from 'react';
-import CodeEditor from '@/components/CodeEditor';
-import Terminal from '@/components/Terminal';
-import Tabs from '@/components/Tabs';
-import LivePreview from '@/components/LivePreview';
-import AIAssistant from '@/components/AIAssistant';
-import KeyboardShortcuts from '@/components/keyboardShortcut';
-import usePythonRunner from '@/components/PythonRunner';
-import { Split, Code, Monitor, Play, Download, GitBranch, Sparkles } from 'lucide-react';
-import Sidebar from '@/components/Sidebar';
+import Link from 'next/link';
+import { Code, Terminal, Zap, Github, Star, Users, BookOpen, Play } from 'lucide-react';
 
-type ViewMode = 'editor' | 'preview' | 'split';
-
-interface FileTab {
-  id: string;
-  name: string;
-  language: string;
-  content: string;
-}
-
-export default function Home() {
-  const [tabs, setTabs] = useState<FileTab[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('');
-  const [viewMode, setViewMode] = useState<ViewMode>('split');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isTerminalOpen, setIsTerminalOpen] = useState(true);
-  const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
-
-  // Initialize Python Runner
-  const pythonRunner = usePythonRunner();
-
-  const getCurrentFileContent = (fileId: string) => {
-    const tab = tabs.find(tab => tab.id === fileId);
-    return tab?.content || '';
-  };
-
-  const updateFileContent = (fileId: string, content: string) => {
-    setTabs(prev => prev.map(tab => 
-      tab.id === fileId ? { ...tab, content } : tab
-    ));
-  };
-
-  const handleFileSelect = (file: any) => {
-    if (file.type === 'file') {
-      const existingTab = tabs.find(tab => tab.id === file.id);
-      if (!existingTab) {
-        const newTab: FileTab = {
-          id: file.id,
-          name: file.name,
-          language: file.language,
-          content: file.content
-        };
-        setTabs(prev => [...prev, newTab]);
-      }
-      setActiveTab(file.id);
-    }
-  };
-
-  const handleTabClose = (tabId: string) => {
-    setTabs(prev => {
-      const newTabs = prev.filter(tab => tab.id !== tabId);
-      if (activeTab === tabId && newTabs.length > 0) {
-        setActiveTab(newTabs[newTabs.length - 1].id);
-      } else if (newTabs.length === 0) {
-        setActiveTab('');
-      }
-      return newTabs;
-    });
-  };
-
-  const handleCreateFile = () => {
-    const newFileId = `new-${Date.now()}`;
-    const newTab: FileTab = {
-      id: newFileId,
-      name: 'new-file.js',
-      language: 'javascript',
-      content: '// New file created in MKCode\nconsole.log("Hello MKCode!");'
-    };
-    setTabs(prev => [...prev, newTab]);
-    setActiveTab(newFileId);
-  };
-
-  const handleRunCode = async (code: string, language: string) => {
-    console.log(`Running ${language} code:`, code);
-    
-    if (language === 'python') {
-      // Use Pyodide for Python execution
-      setTerminalOutput(prev => [...prev, `🐍 Executing Python code...`]);
-      await pythonRunner.runPython(code);
-      setTerminalOutput(prev => [...prev, ...pythonRunner.output.slice(-3)]);
-    } else if (language === 'javascript') {
-      // Simulate JavaScript execution
-      setTerminalOutput(prev => [...prev, `📜 Executing JavaScript...`]);
-      try {
-        // Safe eval for demonstration (in real app, use proper sandbox)
-        const result = eval(code);
-        setTerminalOutput(prev => [...prev, `✅ Output: ${result}`]);
-      } catch (error: any) {
-        setTerminalOutput(prev => [...prev, `❌ Error: ${error.message}`]);
-      }
-    } else {
-      setTerminalOutput(prev => [...prev, `🌐 ${language.toUpperCase()} code ready in preview`]);
-    }
-  };
-
-  // Enhanced Git integration
-  const handleGitCommand = (command: string) => {
-    const gitCommands: { [key: string]: string[] } = {
-      'git status': [
-        'On branch main',
-        'Changes not staged for commit:',
-        '  modified:   src/script.js',
-        '  modified:   src/style.css',
-        'Use "git add <file>..." to update what will be committed'
-      ],
-      'git log': [
-        'commit 123abc (HEAD -> main)',
-        'Author: Developer <dev@mkcode.io>',
-        'Date:   Just now',
-        '    Initial commit'
-      ],
-      'git diff': [
-        'diff --git a/src/script.js b/src/script.js',
-        '+ console.log("New feature added");',
-        '- console.log("Old code removed");'
-      ],
-      'git add .': [
-        'All changes staged for commit'
-      ],
-      'git commit -m "update"': [
-        '[main 456def] update',
-        ' 2 files changed, 15 insertions(+)'
-      ]
-    };
-
-    const output = gitCommands[command] || [`git: '${command.split(' ')[1]}' is not a git command`];
-    setTerminalOutput(prev => [...prev, `$ ${command}`, ...output]);
-  };
-
-  // Project export functionality
-  const exportProject = () => {
-    const project = {
-      files: tabs,
-      config: { 
-        name: 'MKCode Project', 
-        version: '1.0',
-        exported: new Date().toISOString()
-      }
-    };
-    const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mkcode-project-${Date.now()}.json`;
-    a.click();
-    setTerminalOutput(prev => [...prev, '💾 Project exported successfully!']);
-  };
-
-  // Enhanced terminal execution
-  const executeTerminalCommand = (command: string) => {
-    if (command.startsWith('git ')) {
-      handleGitCommand(command);
-    } else if (command === 'export') {
-      exportProject();
-    } else if (command === 'clear') {
-      setTerminalOutput([]);
-    } else if (command === 'help') {
-      setTerminalOutput(prev => [...prev,
-        'Available commands:',
-        '  git status    - Show git status',
-        '  git log       - Show commit history',
-        '  git diff      - Show changes',
-        '  git add .     - Stage all changes',
-        '  export        - Export project',
-        '  clear         - Clear terminal',
-        '  help          - Show this help',
-        '',
-        'Code Execution:',
-        '  Click RUN button or type in editor',
-        '  Python code runs in browser',
-        '  JavaScript executes immediately'
-      ]);
-    } else if (command === 'python --version') {
-      setTerminalOutput(prev => [...prev, 'Python 3.11 (Pyodide)']);
-    } else if (command === 'node --version') {
-      setTerminalOutput(prev => [...prev, 'v18.0.0 (Browser JavaScript)']);
-    } else {
-      setTerminalOutput(prev => [...prev, `$ ${command}`, `Command not found: ${command}`]);
-    }
-  };
-
-  const htmlFile = tabs.find(tab => tab.name.endsWith('.html'))?.content || '';
-  const cssFile = tabs.find(tab => tab.name.endsWith('.css'))?.content || '';
-  const jsFile = tabs.find(tab => tab.name.endsWith('.js'))?.content || '';
-  const activeFile = tabs.find(tab => tab.id === activeTab);
-
+export default function LandingPage() {
   return (
-    <div className="h-screen flex flex-col bg-[#0c0e14] text-green-400 font-mono">
-      {/* Header */}
-      <header className="bg-[#151821] border-b border-[#1f2430] px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+    <div className="min-h-screen bg-black text-white font-mono">
+      {/* Navigation */}
+      <nav className="border-b border-gray-800">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-cyan-400 rounded flex items-center justify-center">
                 <span className="text-black font-bold text-sm">MK</span>
               </div>
-              <div>
-                <p className="text-xs text-cyan-400">web ide</p>
-              </div>
+              <span className="text-xl font-bold">MKCode</span>
             </div>
-          </div>
-          
-          {/* Enhanced Action Buttons */}
-          <div className="flex items-center space-x-2">
-            {/* Export Project */}
-            <button
-              onClick={exportProject}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-black rounded text-sm transition-colors font-bold"
-              title="Export Project"
-            >
-              <Download size={14} />
-              <span>EXPORT</span>
-            </button>
-
-            {/* Git Status */}
-            <button
-              onClick={() => handleGitCommand('git status')}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-black rounded text-sm transition-colors font-bold"
-              title="Git Status"
-            >
-              <GitBranch size={14} />
-              <span>GIT</span>
-            </button>
-
-            {/* Run Code */}
-            {activeFile && (
-              <button
-                onClick={() => handleRunCode(activeFile.content, activeFile.language)}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-black rounded text-sm transition-colors font-bold"
-              >
-                <Play size={14} />
-                <span>RUN</span>
-              </button>
-            )}
-            
-            {/* View Mode Toggle */}
-            <div className="flex bg-[#1f2430] rounded p-1 border border-[#2a3040]">
-              <button
-                onClick={() => setViewMode('editor')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs transition-colors ${
-                  viewMode === 'editor' ? 'bg-green-500 text-black' : 'text-cyan-400 hover:text-green-400'
-                }`}
-              >
-                <Code size={14} />
-                <span>CODE</span>
-              </button>
-              <button
-                onClick={() => setViewMode('split')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs transition-colors ${
-                  viewMode === 'split' ? 'bg-green-500 text-black' : 'text-cyan-400 hover:text-green-400'
-                }`}
-              >
-                <Split size={14} />
-                <span>SPLIT</span>
-              </button>
-              <button
-                onClick={() => setViewMode('preview')}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded text-xs transition-colors ${
-                  viewMode === 'preview' ? 'bg-green-500 text-black' : 'text-cyan-400 hover:text-green-400'
-                }`}
-              >
-                <Monitor size={14} />
-                <span>PREVIEW</span>
-              </button>
+            <div className="flex items-center space-x-6">
+              <Link href="/" className="hover:text-gray-300 transition-colors">Home</Link>
+              <Link href="#features" className="hover:text-gray-300 transition-colors">Features</Link>
+              <Link href="#docs" className="hover:text-gray-300 transition-colors">Docs</Link>
+              <Link href="/ide" className="bg-white text-black px-4 py-2 rounded hover:bg-gray-200 transition-colors font-bold">
+                Launch IDE
+              </Link>
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar 
-          isOpen={isSidebarOpen} 
-          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-          onFileSelect={handleFileSelect}
-          onCreateFile={handleCreateFile}
-        />
-        
-        {/* Editor/Preview Area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Tabs */}
-          {tabs.length > 0 && (
-            <Tabs
-              tabs={tabs}
-              activeTab={activeTab}
-              onTabSelect={setActiveTab}
-              onTabClose={handleTabClose}
-              onTerminalToggle={() => setIsTerminalOpen(!isTerminalOpen)}
-              isTerminalOpen={isTerminalOpen}
-            />
-          )}
-          
-          {/* Editor and Preview */}
-          <div className="flex-1 flex">
-            {/* Code Editor */}
-            {(viewMode === 'editor' || viewMode === 'split') && (
-              <div className={viewMode === 'split' ? 'flex-1' : 'flex-1'}>
-                {activeFile ? (
-                  <CodeEditor
-                    language={activeFile.language}
-                    value={activeFile.content}
-                    onChange={(content) => updateFileContent(activeFile.id, content)}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center text-cyan-400">
-                    <div className="text-center">
-                      <div className="w-12 h-12 bg-[#1f2430] rounded flex items-center justify-center mx-auto mb-3 border border-cyan-400/20">
-                        <Code size={20} className="text-cyan-400" />
-                      </div>
-                      <p className="text-sm font-medium">no file open</p>
-                      <p className="text-xs text-green-400 mt-1">select file from explorer</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {/* Live Preview */}
-            {(viewMode === 'preview' || viewMode === 'split') && (
-              <div className={viewMode === 'split' ? 'flex-1' : 'flex-1'}>
-                <LivePreview html={htmlFile} css={cssFile} js={jsFile} />
-              </div>
-            )}
+      {/* Hero Section */}
+      <section className="container mx-auto px-6 py-20 text-center">
+        <div className="max-w-4xl mx-auto">
+          <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-8">
+            <Code size={32} className="text-black" />
           </div>
-
-          {/* Enhanced Terminal */}
-          <Terminal 
-            isOpen={isTerminalOpen}
-            onToggle={() => setIsTerminalOpen(!isTerminalOpen)}
-            onRunCode={handleRunCode}
-            onExecuteCommand={executeTerminalCommand}
-            currentFile={activeFile}
-            customOutput={terminalOutput}
-          />
+          <h1 className="text-6xl font-bold mb-6">
+            MK<span className="text-gray-400">Code</span>
+          </h1>
+          <p className="text-xl text-gray-400 mb-8 leading-relaxed">
+            A modern, browser-based IDE with terminal-style aesthetics. 
+            <br />
+            Code, preview, and execute — all in one place.
+          </p>
+          <div className="flex items-center justify-center space-x-4 mb-12">
+            <Link 
+              href="/ide" 
+              className="bg-white text-black px-8 py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors flex items-center space-x-2"
+            >
+              <Play size={20} />
+              <span>Launch IDE</span>
+            </Link>
+            <a 
+              href="#docs" 
+              className="border border-gray-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-gray-900 transition-colors"
+            >
+              Read Docs
+            </a>
+          </div>
+          
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto text-center">
+            <div>
+              <div className="text-3xl font-bold">10+</div>
+              <div className="text-gray-400">Languages</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">100%</div>
+              <div className="text-gray-400">Browser-based</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold">OSS</div>
+              <div className="text-gray-400">Open Source</div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* AI Assistant Floating Button */}
-      <AIAssistant />
+      {/* Features Section */}
+      <section id="features" className="border-y border-gray-800 py-20">
+        <div className="container mx-auto px-6">
+          <h2 className="text-4xl font-bold text-center mb-16">Features</h2>
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="text-center p-6 border border-gray-800 rounded-lg hover:border-gray-600 transition-colors">
+              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Code size={24} className="text-black" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Smart Editor</h3>
+              <p className="text-gray-400">
+                Monaco Editor with autocomplete, syntax highlighting, and intelligent code suggestions.
+              </p>
+            </div>
 
-      {/* Keyboard Shortcuts Button */}
-      <KeyboardShortcuts />
+            <div className="text-center p-6 border border-gray-800 rounded-lg hover:border-gray-600 transition-colors">
+              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Terminal size={24} className="text-black" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Integrated Terminal</h3>
+              <p className="text-gray-400">
+                Multi-tab terminal with Python execution, Git commands, and shell emulation.
+              </p>
+            </div>
 
-      {/* Python Runner Integration (hidden but functional) */}
-      <div className="hidden">
-        {/* This ensures PythonRunner is loaded but not visible */}
-      </div>
+            <div className="text-center p-6 border border-gray-800 rounded-lg hover:border-gray-600 transition-colors">
+              <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Zap size={24} className="text-black" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Live Preview</h3>
+              <p className="text-gray-400">
+                Real-time HTML/CSS/JS preview with instant updates as you code.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Documentation Section */}
+      <section id="docs" className="py-20">
+        <div className="container mx-auto px-6">
+          <h2 className="text-4xl font-bold text-center mb-16">Documentation</h2>
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="border border-gray-800 rounded-lg p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <BookOpen size={20} />
+                <h3 className="text-xl font-bold">Getting Started</h3>
+              </div>
+              <ul className="space-y-3 text-gray-400">
+                <li>• Open files from the explorer sidebar</li>
+                <li>• Use Ctrl+Space for autocomplete</li>
+                <li>• Click RUN to execute code</li>
+                <li>• Toggle terminal with the terminal button</li>
+                <li>• Switch between code and preview views</li>
+              </ul>
+            </div>
+
+            <div className="border border-gray-800 rounded-lg p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <Terminal size={20} />
+                <h3 className="text-xl font-bold">Terminal Commands</h3>
+              </div>
+              <ul className="space-y-3 text-gray-400">
+                <li><code>git status</code> - Check git status</li>
+                <li><code>python code.py</code> - Run Python</li>
+                <li><code>export</code> - Download project</li>
+                <li><code>clear</code> - Clear terminal</li>
+                <li><code>help</code> - Show all commands</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Contribute Section */}
+      <section className="border-y border-gray-800 py-20 bg-gray-900">
+        <div className="container mx-auto px-6 text-center">
+          <div className="max-w-2xl mx-auto">
+            <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center mx-auto mb-6">
+              <Github size={32} className="text-black" />
+            </div>
+            <h2 className="text-4xl font-bold mb-6">Open Source</h2>
+            <p className="text-xl text-gray-400 mb-8">
+              MKCode is open source and welcomes contributions from developers worldwide. 
+              Help us build the future of browser-based coding.
+            </p>
+            <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="flex items-center justify-center space-x-2">
+                <Users size={20} />
+                <span>Community Driven</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <Star size={20} />
+                <span>MIT Licensed</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <Code size={20} />
+                <span>TypeScript</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-center space-x-4">
+              <a 
+                href="https://github.com/ChidiebereMichael18/MKcode.git" 
+                className="bg-white text-black px-6 py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Github size={20} />
+                <span>Star on GitHub</span>
+              </a>
+              <a 
+                href="https://github.com/ChidiebereMichael18/MKcode.git/fork" 
+                className="border border-gray-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-800 transition-colors"
+              >
+                Fork & Contribute
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Start Section */}
+      <section className="py-20">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-4xl font-bold mb-8">Ready to Code?</h2>
+          <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+            No installation required. Start coding immediately in your browser with our full-featured IDE.
+          </p>
+          <Link 
+            href="/ide" 
+            className="bg-white text-black px-8 py-4 rounded-lg font-bold hover:bg-gray-200 transition-colors text-lg inline-flex items-center space-x-2"
+          >
+            <Play size={24} />
+            <span>Launch MKCode IDE</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-800 py-8">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+           <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-cyan-400 rounded flex items-center justify-center">
+                <span className="text-black font-bold text-sm">MK</span>
+              </div>
+              <span className="font-bold">MKCode</span>
+            </div>
+            <div className="text-gray-400 text-sm">
+              Built with ❤️ for the coding community
+            </div>
+            <div className="flex items-center space-x-4">
+              <a href="https://github.com/ChidiebereMichael18/MKcode" className="text-gray-400 hover:text-white transition-colors">GitHub</a>
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">Docs</a>
+              <a href="https://github.com/ChidiebereMichael18/MKcode" className="text-gray-400 hover:text-white transition-colors">Contribute</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
